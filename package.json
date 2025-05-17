@@ -1,6 +1,6 @@
 {
   "name": "rhyolite",
-  "displayName": "",
+  "displayName": "rhyolite",
   "description": "markdown note taking enhancements",
   "version": "0.0.1",
   "engines": {
@@ -18,8 +18,8 @@
         "title": "Hello World"
       },
       {
-        "command": "rhyolite.createFile",
-        "title": "Create New File"
+        "command": "rhyolite.rhyCreateFile",
+        "title": "rhyolite: Create File"
       }
     ]
   },

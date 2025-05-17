@@ -19,11 +19,11 @@ export function activate(context: vscode.ExtensionContext) {
 	const helloWorldCommand = vscode.commands.registerCommand('rhyolite.helloWorld', () => {
 		// The code you place here will be executed every time your command is executed
 		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from !');
+		vscode.window.showInformationMessage('Hello World from rhyolite!');
 	});
 
 	// Register the createFile command
-	const createFileCommand = vscode.commands.registerCommand('rhyolite.createFile', async () => {
+	const createFileCommand = vscode.commands.registerCommand('rhyolite.rhyCreateFile', async () => {
 		// Get the workspace folder
 		const workspaceFolders = vscode.workspace.workspaceFolders;
 		if (!workspaceFolders) {
@@ -31,16 +31,37 @@ export function activate(context: vscode.ExtensionContext) {
 			return;
 		}
 
-		// Ask for the filename
-		const fileName = await vscode.window.showInputBox({
-			prompt: 'Enter the filename',
-			placeHolder: 'example.md'
-		});
-
-		if (!fileName) {
-			// User cancelled the input
+		// Get the active text editor
+		const editor = vscode.window.activeTextEditor;
+		if (!editor) {
+			vscode.window.showErrorMessage('No active text editor');
 			return;
 		}
+
+		// Get the selected word or the word at cursor position
+		let word = '';
+		const selection = editor.selection;
+
+		if (!selection.isEmpty) {
+			// Use the selected text
+			word = editor.document.getText(selection);
+		} else {
+			// Get the word at the current cursor position
+			const position = editor.selection.active;
+			const range = editor.document.getWordRangeAtPosition(position);
+
+			if (range) {
+				word = editor.document.getText(range);
+			}
+		}
+
+		if (!word) {
+			vscode.window.showErrorMessage('No word selected or cursor not positioned on a word');
+			return;
+		}
+
+		// Use the word as the filename with .md extension
+		const fileName = `${word}.md`;
 
 		// Ask for the file content
 		const fileContent = await vscode.window.showInputBox({
