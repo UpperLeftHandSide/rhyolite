@@ -1,13 +1,68 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { promises as fsPromises } from 'fs';
 import * as path from 'path';
 import { glob } from 'glob';
 
-// This method is called when your extension is activated
-// Your extension is activated the very first time the command is executed
+function clearSection(indexContent: string, sectionHeaderDepth: string, sectionName: string): string {
+	const section = sectionHeaderDepth + ' ' + sectionName;
+	if (!indexContent.includes(section)) {
+		indexContent += `\n${section}\n\n`;
+	} else {
+		// Find the Links section and clear existing links
+		const regex = new RegExp(`/^${sectionHeaderDepth} `, 'm');
+		const sections = indexContent.split(regex);
+		for (let i = 0; i < sections.length; i++) {
+			if (sections[i].startsWith(sectionName)) {
+				// Keep the "Links" header and clear the content
+				sections[i] = `${sectionName}\n\n`;
+				indexContent = sections.slice(0, 1).join('') +
+					sections.slice(1).map(s => `${sectionHeaderDepth} ` + s).join('');
+				break;
+			}
+		}
+	}
+	return indexContent;
+}
+
+async function addLinks(indexContent: string,
+						markDownFiles: string[],
+						workspacePath: string,
+						headerSection: string): Promise<[string, number]> {
+	// Add links to all markdown files
+	let linksAdded = 0;
+	for (const file of markDownFiles) {
+		// Get the file title (first # heading) if possible
+		let fileTitle = path.basename(file, '.md');
+		try {
+			const filePath = path.join(workspacePath, file);
+			const fileContent = await fsPromises.readFile(filePath, 'utf8');
+			const titleMatch = fileContent.match(/^# (.+)$/m);
+			if (titleMatch && titleMatch[1]) {
+				fileTitle = titleMatch[1];
+			}
+		} catch {
+			// If we can't read the file, just use the filename
+		}
+
+		// Create the link and add it to index.md
+		const link = `- [${fileTitle}](${file})\n`;
+
+		// Find the Links section and add the link
+		const linksHeaderPos = indexContent.indexOf(headerSection);
+		if (linksHeaderPos !== -1) {
+			const insertPos = indexContent.indexOf('\n', linksHeaderPos) + 1;
+			indexContent = indexContent.slice(0, insertPos) + link + indexContent.slice(insertPos);
+			linksAdded++;
+		} else {
+			// Fallback: just append to the end
+			indexContent += link;
+			linksAdded++;
+		}
+	}
+	return [indexContent, linksAdded];
+}
+
 export function activate(context: vscode.ExtensionContext) {
 
 	// Use the console to output diagnostic information (console.log) and errors (console.error)
@@ -118,17 +173,24 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 
 		try {
-			const workspacePath = workspaceFolders[0].uri.fsPath;
+			const workspacePath = workspaceFolders[0].uri.fsPath; // does this change with depth?
 			const indexPath = path.join(workspacePath, 'index.md');
 
+			const ignore = ['**/node_modules/**', '**/out/**'];
 			// Find all markdown files in the workspace
-			const markdownFiles = await glob('**/*.md', { 
+			const markdownFiles = await glob('*.md', { 
 				cwd: workspacePath,
-				ignore: ['**/node_modules/**', '**/out/**'] 
+				ignore: ignore 
+			});
+			
+			const otherIndexFiles = await glob("**/index.md", {
+				cwd: workspacePath,
+				ignore: ignore
 			});
 
 			// Filter out index.md itself
 			const otherMarkdownFiles = markdownFiles.filter(file => file !== 'index.md');
+			const filterOutTopLevelIndex = otherIndexFiles.filter(file => file !== 'index.md');
 
 			if (otherMarkdownFiles.length === 0) {
 				vscode.window.showInformationMessage('No markdown files found to link to.');
@@ -148,63 +210,21 @@ export function activate(context: vscode.ExtensionContext) {
 				indexContent = '# Index\n\n';
 			}
 
-			// Create a section for links if it doesn't exist
-			if (!indexContent.includes('## Links')) {
-				indexContent += '\n## Links\n\n';
-			} else {
-				// Find the Links section and clear existing links
-				const sections = indexContent.split(/^## /m);
-				for (let i = 0; i < sections.length; i++) {
-					if (sections[i].startsWith('Links')) {
-						// Keep the "Links" header and clear the content
-						sections[i] = 'Links\n\n';
-						indexContent = sections.slice(0, 1).join('') + 
-							sections.slice(1).map(s => '## ' + s).join('');
-						break;
-					}
-				}
-			}
-
-			// Add links to all markdown files
-			let linksAdded = 0;
-			for (const file of otherMarkdownFiles) {
-				// Get the file title (first # heading) if possible
-				let fileTitle = path.basename(file, '.md');
-				try {
-					const filePath = path.join(workspacePath, file);
-					const fileContent = await fsPromises.readFile(filePath, 'utf8');
-					const titleMatch = fileContent.match(/^# (.+)$/m);
-					if (titleMatch && titleMatch[1]) {
-						fileTitle = titleMatch[1];
-					}
-				} catch {
-					// If we can't read the file, just use the filename
-				}
-
-				// Create the link and add it to index.md
-				const link = `- [${fileTitle}](${file})\n`;
-
-				// Find the Links section and add the link
-				const linksHeaderPos = indexContent.indexOf('## Links');
-				if (linksHeaderPos !== -1) {
-					const insertPos = indexContent.indexOf('\n', linksHeaderPos) + 1;
-					indexContent = indexContent.slice(0, insertPos) + link + indexContent.slice(insertPos);
-					linksAdded++;
-				} else {
-					// Fallback: just append to the end
-					indexContent += link;
-					linksAdded++;
-				}
-			}
+			indexContent = clearSection(indexContent, '##', 'Indexes');
+			indexContent = clearSection(indexContent, '##', 'Links');
+			let count1;
+			let count2;
+			[indexContent, count1] = await addLinks(indexContent, otherMarkdownFiles, workspacePath, '## Links');
+			[indexContent, count2] = await addLinks(indexContent, otherIndexFiles, workspacePath, '## Indexes');
 
 			// Write the updated index.md
 			await fsPromises.writeFile(indexPath, indexContent);
 
 			// Show success message
-			const message = indexExists 
-				? `Updated index.md with ${linksAdded} links.` 
-				: `Created index.md with ${linksAdded} links.`;
-			vscode.window.showInformationMessage(message);
+			const message = indexExists
+				? `Updated index.md with ${count1 + count2} links.`
+				: `Created index.md with ${count1 + count2} links.`;
+			// vscode.window.showInformationMessage(message);
 
 			// Open the index.md file
 			const document = await vscode.workspace.openTextDocument(indexPath);

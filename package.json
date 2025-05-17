@@ -32,13 +32,12 @@
     "test": "vscode-test"
   },
   "dependencies": {
-    "glob": "^10.3.10"
+    "glob": "^11.0.2"
   },
   "devDependencies": {
     "@types/vscode": "^1.100.0",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
-    "@types/glob": "^8.1.0",
     "@typescript-eslint/eslint-plugin": "^8.31.1",
     "@typescript-eslint/parser": "^8.31.1",
     "eslint": "^9.25.1",
