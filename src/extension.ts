@@ -10,7 +10,7 @@ function clearSection(indexContent: string, sectionHeaderDepth: string, sectionN
 		indexContent += `\n${section}\n\n`;
 	} else {
 		// Find the Links section and clear existing links
-		const regex = new RegExp(`/^${sectionHeaderDepth} `, 'm');
+		const regex = new RegExp(`^${sectionHeaderDepth} `, 'm');
 		const sections = indexContent.split(regex);
 		for (let i = 0; i < sections.length; i++) {
 			if (sections[i].startsWith(sectionName)) {
@@ -163,6 +163,7 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	});
 
+	// TODO make this recursive for index files
 	// Register the updateIndexLinks command
 	const updateIndexLinksCommand = vscode.commands.registerCommand('rhyolite.updateIndexLinks', async () => {
 		// Get the workspace folder
@@ -210,12 +211,13 @@ export function activate(context: vscode.ExtensionContext) {
 				indexContent = '# Index\n\n';
 			}
 
+			let count1: number;
+			let count2: number;
 			indexContent = clearSection(indexContent, '##', 'Indexes');
+			// for indexes we actually want the directory returned as the link name
+			[indexContent, count2] = await addLinks(indexContent, filterOutTopLevelIndex, workspacePath, '## Indexes');
 			indexContent = clearSection(indexContent, '##', 'Links');
-			let count1;
-			let count2;
 			[indexContent, count1] = await addLinks(indexContent, otherMarkdownFiles, workspacePath, '## Links');
-			[indexContent, count2] = await addLinks(indexContent, otherIndexFiles, workspacePath, '## Indexes');
 
 			// Write the updated index.md
 			await fsPromises.writeFile(indexPath, indexContent);
