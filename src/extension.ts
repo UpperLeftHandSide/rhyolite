@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import * as os from 'os';
 import { createFileLink, updateIndexFile } from './commands';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -9,6 +10,14 @@ export function activate(context: vscode.ExtensionContext) {
 
 	let createFileCommand: vscode.Disposable | undefined;
 	let updateIndexLinksCommand: vscode.Disposable | undefined;
+
+	// Helper function to expand tilde in paths
+	function expandTildePath(filePath: string): string {
+		if (filePath.startsWith('~')) {
+			return path.join(os.homedir(), filePath.slice(1));
+		}
+		return filePath;
+	}
 
 	// Function to check if the current directory is in the allowlist
 	function isDirectoryAllowed(): boolean {
@@ -32,12 +41,15 @@ export function activate(context: vscode.ExtensionContext) {
 
 		// Check if the current directory or any parent directory is in the allowlist
 		return allowedDirectories.some(allowedDir => {
+			// Expand tilde if present
+			const expandedAllowedDir = expandTildePath(allowedDir);
+
 			// Normalize paths for comparison
-			const normalizedAllowedDir = path.normalize(allowedDir);
-			const normalizedCurrentDir = path.normalize(currentDir);
+			const normalizedAllowedDir = path.normalize(expandedAllowedDir);
+			// const normalizedCurrentDir = path.normalize(currentDir);
 
 			// Check if current directory starts with the allowed directory path
-			return normalizedCurrentDir.startsWith(normalizedAllowedDir);
+			return normalizedAllowedDir.startsWith(currentDir);
 		});
 	}
 
