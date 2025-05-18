@@ -166,6 +166,60 @@ export async function createFileLink() {
 	}
 }
 
+// Helper function to update a single index file
+async function updateSingleIndexFile(indexPath: string, basePath: string, ignore: string[]): Promise<[boolean, number]> {
+	// Find all markdown files in the same directory as the index file
+	const markdownFiles = await glob('*.md', { 
+		cwd: basePath,
+		ignore: ignore 
+	});
+
+	const otherIndexFiles = await glob("**/index.md", {
+		cwd: basePath,
+		ignore: ignore
+	});
+
+	// Filter out index.md itself
+	const otherMarkdownFiles = markdownFiles.filter(file => file !== 'index.md');
+	const filterOutTopLevelIndex = otherIndexFiles.filter(file => file !== 'index.md');
+
+	if (otherMarkdownFiles.length === 0 && filterOutTopLevelIndex.length === 0) {
+		return [false, 0]; // No files to link to
+	}
+
+	// Check if index.md exists, create it if not
+	let indexContent = '';
+	let indexExists = false;
+
+	try {
+		await fsPromises.access(indexPath, fs.constants.F_OK);
+		indexContent = await fsPromises.readFile(indexPath, 'utf8');
+		indexExists = true;
+	} catch {
+		// Index doesn't exist, create it with a title
+		indexContent = '# Index\n\n';
+	}
+
+	let count1 = 0;
+	let count2 = 0;
+
+	if (filterOutTopLevelIndex.length > 0) {
+		indexContent = clearSection(indexContent, '##', 'Indexes');
+		// for indexes we actually want the directory returned as the link name
+		[indexContent, count2] = await addLinks(indexContent, filterOutTopLevelIndex, basePath, '## Indexes');
+	}
+
+	if (otherMarkdownFiles.length > 0) {
+		indexContent = clearSection(indexContent, '##', 'Links');
+		[indexContent, count1] = await addLinks(indexContent, otherMarkdownFiles, basePath, '## Links');
+	}
+
+	// Write the updated index.md
+	await fsPromises.writeFile(indexPath, indexContent);
+
+	return [indexExists, count1 + count2];
+}
+
 export async function updateIndexFile() {
 	// Get the workspace folder
 	const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -187,57 +241,40 @@ export async function updateIndexFile() {
 		}
 
 		const ignore = ['**/node_modules/**', '**/out/**'];
-		// Find all markdown files in the same directory as the index file
-		const markdownFiles = await glob('*.md', { 
-			cwd: basePath,
-			ignore: ignore 
-		});
 
-		const otherIndexFiles = await glob("**/index.md", {
+		// Update the current index file first
+		const [indexExists, linksCount] = await updateSingleIndexFile(indexPath, basePath, ignore);
+
+		// Find all index.md files in subdirectories
+		const allIndexFiles = await glob("**/index.md", {
 			cwd: basePath,
 			ignore: ignore
 		});
 
-		// Filter out index.md itself
-		const otherMarkdownFiles = markdownFiles.filter(file => file !== 'index.md');
-		const filterOutTopLevelIndex = otherIndexFiles.filter(file => file !== 'index.md');
+		// Filter out the current index.md file
+		const otherIndexFiles = allIndexFiles.filter(file => {
+			const fullPath = path.join(basePath, file);
+			return fullPath !== indexPath;
+		});
 
-		if (otherMarkdownFiles.length === 0) {
-			vscode.window.showInformationMessage('No markdown files found to link to.');
-			return;
+		// Update each index file recursively
+		let totalUpdated = 1; // Count the main index file
+		for (const indexFile of otherIndexFiles) {
+			const fullPath = path.join(basePath, indexFile);
+			const dirPath = path.dirname(fullPath);
+			const [exists, count] = await updateSingleIndexFile(fullPath, dirPath, ignore);
+			if (count > 0) {
+				totalUpdated++;
+			}
 		}
-
-		// Check if index.md exists, create it if not
-		let indexContent = '';
-		let indexExists = false;
-
-		try {
-			await fsPromises.access(indexPath, fs.constants.F_OK);
-			indexContent = await fsPromises.readFile(indexPath, 'utf8');
-			indexExists = true;
-		} catch {
-			// Index doesn't exist, create it with a title
-			indexContent = '# Index\n\n';
-		}
-
-		let count1: number;
-		let count2: number;
-		indexContent = clearSection(indexContent, '##', 'Indexes');
-		// for indexes we actually want the directory returned as the link name
-		[indexContent, count2] = await addLinks(indexContent, filterOutTopLevelIndex, basePath, '## Indexes');
-		indexContent = clearSection(indexContent, '##', 'Links');
-		[indexContent, count1] = await addLinks(indexContent, otherMarkdownFiles, basePath, '## Links');
-
-		// Write the updated index.md
-		await fsPromises.writeFile(indexPath, indexContent);
 
 		// Show success message
 		const message = indexExists
-			? `Updated index.md with ${count1 + count2} links.`
-			: `Created index.md with ${count1 + count2} links.`;
-		// vscode.window.showInformationMessage(message);
+			? `Updated ${totalUpdated} index.md files with links.`
+			: `Created and updated ${totalUpdated} index.md files with links.`;
+		vscode.window.showInformationMessage(message);
 
-		// Open the index.md file
+		// Open the main index.md file
 		const document = await vscode.workspace.openTextDocument(indexPath);
 		await vscode.window.showTextDocument(document);
 
