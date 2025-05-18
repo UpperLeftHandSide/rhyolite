@@ -32,6 +32,14 @@
           "type": "boolean",
           "default": true,
           "description": "Enable or disable the Rhyolite extension"
+        },
+        "rhyolite.allowedDirectories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "List of directories where the extension should be active. If empty, the extension will be active in all directories (when enabled)."
         }
       }
     }

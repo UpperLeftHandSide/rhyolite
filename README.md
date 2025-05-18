@@ -15,6 +15,7 @@ There is also a function to create a link in the current file, and then create t
 This extension contributes the following settings:
 
 * `rhyolite.enabled`: Enable/disable this extension. When disabled, the commands will not be available.
+* `rhyolite.allowedDirectories`: An array of directory paths where the extension should be active. If empty, the extension will be active in all directories (when enabled). Example: `["/home/user/notes", "/home/user/projects/documentation"]`
 
 ## Known Issues
 
