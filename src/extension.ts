@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { clearSection, addLinks, createFileLink, updateIndexFile } from './commands';
+import { createFileLink, updateIndexFile } from './commands';
 
 export function activate(context: vscode.ExtensionContext) {
 
@@ -10,7 +10,6 @@ export function activate(context: vscode.ExtensionContext) {
 	// Register the createFile command
 	const createFileCommand = vscode.commands.registerCommand('rhyolite.rhyCreateFile', createFileLink);
 
-	// TODO make this recursive for index files
 	// Register the updateIndexLinks command
 	const updateIndexLinksCommand = vscode.commands.registerCommand('rhyolite.updateIndexLinks', updateIndexFile);
 

@@ -34,15 +34,21 @@ export async function addLinks(indexContent: string,
 	for (const file of markDownFiles) {
 		// Get the file title (first # heading) if possible
 		let fileTitle = path.basename(file, '.md');
-		try {
-			const filePath = path.join(workspacePath, file);
-			const fileContent = await fsPromises.readFile(filePath, 'utf8');
-			const titleMatch = fileContent.match(/^# (.+)$/m);
-			if (titleMatch && titleMatch[1]) {
-				fileTitle = titleMatch[1];
+
+		// If the file is index.md, use the directory name as the label
+		if (path.basename(file) === 'index.md') {
+			fileTitle = path.basename(path.dirname(file));
+		} else {
+			try {
+				const filePath = path.join(workspacePath, file);
+				const fileContent = await fsPromises.readFile(filePath, 'utf8');
+				const titleMatch = fileContent.match(/^# (.+)$/m);
+				if (titleMatch && titleMatch[1]) {
+					fileTitle = titleMatch[1];
+				}
+			} catch {
+				// If we can't read the file, just use the filename
 			}
-		} catch {
-			// If we can't read the file, just use the filename
 		}
 
 		// Create the link and add it to index.md
@@ -188,7 +194,7 @@ async function updateSingleIndexFile(indexPath: string, basePath: string, ignore
 	}
 
 	// Check if index.md exists, create it if not
-	let indexContent = '';
+	let indexContent: string;
 	let indexExists = false;
 
 	try {
@@ -243,7 +249,7 @@ export async function updateIndexFile() {
 		const ignore = ['**/node_modules/**', '**/out/**'];
 
 		// Update the current index file first
-		const [indexExists, linksCount] = await updateSingleIndexFile(indexPath, basePath, ignore);
+		const [indexExists, _] = await updateSingleIndexFile(indexPath, basePath, ignore);
 
 		// Find all index.md files in subdirectories
 		const allIndexFiles = await glob("**/index.md", {
@@ -262,7 +268,7 @@ export async function updateIndexFile() {
 		for (const indexFile of otherIndexFiles) {
 			const fullPath = path.join(basePath, indexFile);
 			const dirPath = path.dirname(fullPath);
-			const [exists, count] = await updateSingleIndexFile(fullPath, dirPath, ignore);
+			const [_, count] = await updateSingleIndexFile(fullPath, dirPath, ignore);
 			if (count > 0) {
 				totalUpdated++;
 			}
