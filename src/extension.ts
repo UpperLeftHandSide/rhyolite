@@ -79,8 +79,8 @@ export function activate(context: vscode.ExtensionContext) {
 			updateIndexLinksCommand = vscode.commands.registerCommand('rhyolite.updateIndexLinks', updateIndexFile);
 
 			// Add commands to subscriptions
-			if (createFileCommand) context.subscriptions.push(createFileCommand);
-			if (updateIndexLinksCommand) context.subscriptions.push(updateIndexLinksCommand);
+			if (createFileCommand) { context.subscriptions.push(createFileCommand); }
+			if (updateIndexLinksCommand) { context.subscriptions.push(updateIndexLinksCommand); }
 
 			console.log('Rhyolite commands registered - extension is enabled and directory is allowed');
 		} else {

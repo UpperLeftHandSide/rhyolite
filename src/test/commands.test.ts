@@ -5,6 +5,24 @@ import * as path from 'path';
 import { promises as fsPromises } from 'fs';
 import * as sinon from 'sinon';
 import { clearSection, addLinks, createFileLink, updateIndexFile } from '../commands';
+import {WorkspaceEdit} from "vscode";
+
+// Create a variable to store the last created WorkspaceEdit instance
+let lastWorkspaceEditInstance: any = null;
+
+class VSCodeWrapper {
+    createWorkspaceEdit() {
+        return new vscode.WorkspaceEdit();
+    }
+
+    applyWorkspaceEdit(edit: vscode.WorkspaceEdit) {
+        return vscode.workspace.applyEdit(edit);
+    }
+
+    showErrorMessage(message: string) {
+        return vscode.window.showErrorMessage(message);
+    }
+}
 
 suite('Commands Test Suite', () => {
     vscode.window.showInformationMessage('Start commands tests.');
@@ -38,7 +56,7 @@ suite('Commands Test Suite', () => {
     // Tests for addLinks function
     suite('addLinks', () => {
         test('should add links to the specified section', async () => {
-            const indexContent = '# Index\n\n## Links\n\n';
+            const indexContent = '# Index\n\n\n## Links\n\n';
             const markdownFiles = ['file1.md', 'file2.md'];
             const workspacePath = '/fake/path';
 
@@ -111,16 +129,19 @@ suite('Commands Test Suite', () => {
             assert.strictEqual(showErrorMessageStub.calledWith('No active text editor'), true);
         });
 
-        test('should prompt for input if no word is selected or at cursor', async () => {
+        test('should prompt for input if no word is selected or cursor, create link text, and create file', async () => {
             // Mock workspace.workspaceFolders
             sandbox.stub(vscode.workspace, 'workspaceFolders').value([{ uri: { fsPath: '/fake/path' } }]);
 
             // Mock window.activeTextEditor with empty selection and no word at cursor
+            const cursorPosition = new vscode.Position(1, 2);
             const editor = {
-                selection: { isEmpty: true, active: {} },
+                selection: { isEmpty: true, active: cursorPosition },
                 document: { 
                     getWordRangeAtPosition: () => null,
-                    getText: () => ''
+                    getText: () => '',
+                    fileName: 'something.md',
+                    uri: { fsPath: '/fake/path/something.md' }
                 }
             };
             sandbox.stub(vscode.window, 'activeTextEditor').value(editor);
@@ -135,13 +156,16 @@ suite('Commands Test Suite', () => {
             // Mock vscode functions
             sandbox.stub(vscode.window, 'showInformationMessage').resolves();
             const workspaceEditStub = sandbox.stub();
+            // sandbox.stub(vscode, 'WorkspaceEdit').returns({replace: workspaceEditStub });
             const applyEditStub = sandbox.stub(vscode.workspace, 'applyEdit').resolves();
-            sandbox.stub(vscode, 'WorkspaceEdit').returns({ replace: workspaceEditStub });
             // @ts-ignore
             sandbox.stub(vscode.workspace, 'openTextDocument').resolves({});
             sandbox.stub(vscode.window, 'showTextDocument').resolves();
-
-            await createFileLink();
+            const editStub = {
+                insert: sandbox.stub()
+            };
+            // @ts-ignore edit for test
+            await createFileLink(() => editStub);
 
             // Verify showInputBox was called
             assert.strictEqual(showInputBoxStub.called, true);
@@ -151,6 +175,10 @@ suite('Commands Test Suite', () => {
                 path.join('/fake/path', 'testinput.md'), 
                 '# TestInput'
             ), true);
+
+            assert.strictEqual(editStub.insert.calledWith(editor.document.uri, cursorPosition, '[TestInput](testinput.md)'), true);
+
+            assert.strictEqual(applyEditStub.called, true);
         });
 
         test('should return early if user cancels input when no word is selected', async () => {
@@ -185,10 +213,12 @@ suite('Commands Test Suite', () => {
         test('should create file and replace selection with link when text is selected', async () => {
             // Mock workspace.workspaceFolders
             const workspacePath = '/fake/path';
+            const workspaceStub = sandbox.stub();
             sandbox.stub(vscode.workspace, 'workspaceFolders').value([{ uri: { fsPath: workspacePath } }]);
 
+            const cursorPosition = new vscode.Position(1, 2);
             // Mock window.activeTextEditor with selection
-            const selection = { isEmpty: false };
+            const selection = { isEmpty: false,  };
             const document = { 
                 fileName: '/fake/path/document.md',
                 getText: sandbox.stub().returns('TestWord'),
@@ -206,14 +236,15 @@ suite('Commands Test Suite', () => {
 
             // Mock vscode functions
             sandbox.stub(vscode.window, 'showInformationMessage').resolves();
-            const workspaceEditStub = sandbox.stub();
             const applyEditStub = sandbox.stub(vscode.workspace, 'applyEdit').resolves();
-            sandbox.stub(vscode, 'WorkspaceEdit').returns({ replace: workspaceEditStub });
             // @ts-ignore
             sandbox.stub(vscode.workspace, 'openTextDocument').resolves({});
             sandbox.stub(vscode.window, 'showTextDocument').resolves();
-
-            await createFileLink();
+            const editStub = {
+                replace: sandbox.stub()
+            };
+            // @ts-ignore edit for test
+            await createFileLink(() => editStub);
 
             // Verify file was created with correct content
             assert.strictEqual(writeFileStub.calledWith(
@@ -221,8 +252,11 @@ suite('Commands Test Suite', () => {
                 '# TestWord'
             ), true);
 
+
             // Verify link was created
-            assert.strictEqual(workspaceEditStub.calledWith(
+            // The replace method of our MockWorkspaceEdit class will be called
+            // We can access it through the lastWorkspaceEditInstance variable
+            assert.strictEqual(editStub.replace.calledWith(
                 document.uri, 
                 selection, 
                 '[TestWord](testword.md)'

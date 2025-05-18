@@ -7,7 +7,7 @@ import { glob } from 'glob';
 export function clearSection(indexContent: string, sectionHeaderDepth: string, sectionName: string): string {
 	const section = sectionHeaderDepth + ' ' + sectionName;
 	if (!indexContent.includes(section)) {
-		indexContent += `\n${section}\n\n`;
+		indexContent += `${section}\n\n`;
 	} else {
 		// Find the Links section and clear existing links
 		const regex = new RegExp(`^${sectionHeaderDepth} `, 'm');
@@ -69,7 +69,7 @@ export async function addLinks(indexContent: string,
 	return [indexContent, linksAdded];
 }
 
-export async function createFileLink() {
+export async function createFileLink(createWorkspaceEdit: () => vscode.WorkspaceEdit = () => new vscode.WorkspaceEdit()) {
 	// Get the workspace folder
 	const workspaceFolders = vscode.workspace.workspaceFolders;
 	if (!workspaceFolders) {
@@ -160,7 +160,7 @@ export async function createFileLink() {
 		// If we're in an index.md file, the link should be relative to the current directory
 		// If we're not in an index.md file, the link should be to the file in the workspace root
 		const markdownLink = `[${word}](${fileName})`;
-		const edit = new vscode.WorkspaceEdit();
+		const edit = createWorkspaceEdit();
 		if (!selection.isEmpty) {
 			edit.replace(editor.document.uri, selection, markdownLink);
 		} else {
@@ -168,6 +168,9 @@ export async function createFileLink() {
 			const range = editor.document.getWordRangeAtPosition(position);
 			if (range) {
 				edit.replace(editor.document.uri, range, markdownLink);
+			} else {
+				// Insert the markdown link at the cursor position when no word is selected
+				edit.insert(editor.document.uri, position, markdownLink);
 			}
 		}
 		await vscode.workspace.applyEdit(edit);
@@ -179,6 +182,7 @@ export async function createFileLink() {
 		vscode.window.showErrorMessage(`Error creating file: ${error instanceof Error ? error.message : String(error)}`);
 	}
 }
+
 
 // Helper function to update a single index file
 async function updateSingleIndexFile(indexPath: string, basePath: string, ignore: string[]): Promise<[boolean, number]> {
