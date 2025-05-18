@@ -24,7 +24,17 @@
         "command": "rhyolite.updateIndexLinks",
         "title": "rhyolite: Update Index Links"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "Rhyolite",
+      "properties": {
+        "rhyolite.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable the Rhyolite extension"
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
