@@ -111,7 +111,7 @@ suite('Commands Test Suite', () => {
             assert.strictEqual(showErrorMessageStub.calledWith('No active text editor'), true);
         });
 
-        test('should show error if no word is selected or at cursor', async () => {
+        test('should prompt for input if no word is selected or at cursor', async () => {
             // Mock workspace.workspaceFolders
             sandbox.stub(vscode.workspace, 'workspaceFolders').value([{ uri: { fsPath: '/fake/path' } }]);
 
@@ -125,12 +125,61 @@ suite('Commands Test Suite', () => {
             };
             sandbox.stub(vscode.window, 'activeTextEditor').value(editor);
 
-            // Mock window.showErrorMessage
-            const showErrorMessageStub = sandbox.stub(vscode.window, 'showErrorMessage');
+            // Mock window.showInputBox
+            const showInputBoxStub = sandbox.stub(vscode.window, 'showInputBox').resolves('TestInput');
+
+            // Mock fs functions
+            sandbox.stub(fsPromises, 'access').rejects(); // File doesn't exist
+            const writeFileStub = sandbox.stub(fsPromises, 'writeFile').resolves();
+
+            // Mock vscode functions
+            sandbox.stub(vscode.window, 'showInformationMessage').resolves();
+            const workspaceEditStub = sandbox.stub();
+            const applyEditStub = sandbox.stub(vscode.workspace, 'applyEdit').resolves();
+            sandbox.stub(vscode, 'WorkspaceEdit').returns({ replace: workspaceEditStub });
+            // @ts-ignore
+            sandbox.stub(vscode.workspace, 'openTextDocument').resolves({});
+            sandbox.stub(vscode.window, 'showTextDocument').resolves();
 
             await createFileLink();
 
-            assert.strictEqual(showErrorMessageStub.calledWith('No word selected or cursor not positioned on a word'), true);
+            // Verify showInputBox was called
+            assert.strictEqual(showInputBoxStub.called, true);
+
+            // Verify file was created with correct content
+            assert.strictEqual(writeFileStub.calledWith(
+                path.join('/fake/path', 'testinput.md'), 
+                '# TestInput'
+            ), true);
+        });
+
+        test('should return early if user cancels input when no word is selected', async () => {
+            // Mock workspace.workspaceFolders
+            sandbox.stub(vscode.workspace, 'workspaceFolders').value([{ uri: { fsPath: '/fake/path' } }]);
+
+            // Mock window.activeTextEditor with empty selection and no word at cursor
+            const editor = {
+                selection: { isEmpty: true, active: {} },
+                document: { 
+                    getWordRangeAtPosition: () => null,
+                    getText: () => ''
+                }
+            };
+            sandbox.stub(vscode.window, 'activeTextEditor').value(editor);
+
+            // Mock window.showInputBox to return empty (user cancelled)
+            const showInputBoxStub = sandbox.stub(vscode.window, 'showInputBox').resolves('');
+
+            // Mock fs functions
+            const writeFileStub = sandbox.stub(fsPromises, 'writeFile').resolves();
+
+            await createFileLink();
+
+            // Verify showInputBox was called
+            assert.strictEqual(showInputBoxStub.called, true);
+
+            // Verify file was NOT created
+            assert.strictEqual(writeFileStub.called, false);
         });
 
         test('should create file and replace selection with link when text is selected', async () => {

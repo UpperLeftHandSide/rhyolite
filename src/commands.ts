@@ -85,7 +85,7 @@ export async function createFileLink() {
 	}
 
 	// Get the selected word or the word at cursor position
-	let word = '';
+	let word: string | undefined = '';
 	const selection = editor.selection;
 
 	if (!selection.isEmpty) {
@@ -102,8 +102,16 @@ export async function createFileLink() {
 	}
 
 	if (!word) {
-		vscode.window.showErrorMessage('No word selected or cursor not positioned on a word');
-		return;
+		// Ask for user input if no word is selected
+		word = await vscode.window.showInputBox({
+			prompt: 'Enter a name for the new file',
+			placeHolder: 'File name'
+		});
+
+		if (!word) {
+			// User cancelled the input
+			return;
+		}
 	}
 
 	// Use the word as the filename with .md extension
