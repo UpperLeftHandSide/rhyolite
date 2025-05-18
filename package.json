@@ -4,6 +4,8 @@
   "description": "markdown note taking enhancements",
   "version": "0.0.1",
   "icon": "rhyolite.png",
+  "repository": "https://github.com/UpperLeftHandSide/rhyolite.git",
+  "license": "MIT",
   "engines": {
     "vscode": "^1.100.0"
   },
